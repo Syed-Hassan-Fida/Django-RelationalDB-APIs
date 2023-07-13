@@ -9,6 +9,7 @@ from .api.serializers import *
 from books.models import Publisher, Author, Book, Customer, MyBook, Comment
 from rest_framework.generics import *
 from .permissions import IsadminOrStaffReadOnly, IscommentOwnerorReadOnly
+from .api.pagination import SmallPagination
 from django.db.models import Sum
 
 
@@ -48,8 +49,10 @@ def registerApi(request):
 
 # ------------------ Book Class Api View ------------------------------
 class GetAllBooksAPIView(ListAPIView):
-    queryset = Book.objects.all()
+    queryset = Book.objects.order_by("-id")
     serializer_class = BookSerializer
+    pagination_class = SmallPagination
+
     def get(self, request, *args, **kwargs):
         return self.list(request, *args, **kwargs)
     
