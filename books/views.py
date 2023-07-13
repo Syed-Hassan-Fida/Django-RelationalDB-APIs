@@ -105,30 +105,92 @@ class GetAllCustomerAPIView(ListAPIView):
         return self.list(request, *args, **kwargs)
     
 class CreateCustomerAPIView(CreateAPIView):
-    queryset = Customer.objects.all()
-    serializer_class = CustomerSerializer
-
     def post(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return self.create(request, *args, **kwargs)
+            data = request.data 
+            book_price = 0
+
+            try:
+                if data['books'] != None:
+                    book_price = Book.objects.filter(id=data['books'][0]).first().price
+            except Exception as e:
+                return Response({"error": "Server Error", "status": False}, status=500)
+            
+            total_price = int(data['total_book']) * int(book_price)
+
+            data['total_price'] = total_price
+
+            serializer = CustomerSerializer(data=data)
+            if serializer.is_valid():
+                serializer.save()
+                return Response({"message": "Data saved successfully.", "status": True}, status=201)
+            else:
+                return Response(serializer.errors, status=400)
         else:
-            return Response({"message": "UnAuthenticated"})
+            return Response({"message": "Unauthenticated."}, status=401)
 
 class UpdateCustomerAPIView(UpdateAPIView):
-    queryset = Customer.objects.all()
-    serializer_class = CustomerSerializer
 
     def put(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return self.update(request, *args, **kwargs)
+            order_id = self.kwargs.get("pk")
+            try:
+                customer = Customer.objects.filter(id=order_id).first()
+            except Customer.DoesNotExist:
+                return Response({"message": "Customer not found."}, status=404)
+            
+            data = request.data
+            book_price = 0
+            
+            try:
+                if data['books'] is not None:
+                    book_price = Book.objects.filter(id=data['books'][0]).first().price
+            except Exception as e:
+                return Response({"error": "Server Error", "status": False}, status=500)
+            
+            total_price = int(data['total_book']) * int(book_price)
+            data['total_price'] = total_price
+
+            serializer = CustomerSerializer(customer, data=data, partial=True)
+            
+            if serializer.is_valid():
+                serializer.save()
+                return Response({"message": "Data updated successfully.", "status": True}, status=200)
+            else:
+                return Response(serializer.errors, status=400)
         else:
-            return Response({"message": "UnAuthenticated"})
+            return Response({"message": "Unauthenticated."}, status=401)
+
 
     def patch(self, request, *args, **kwargs):
         if request.user.is_authenticated:
-            return self.partial_update(request, *args, **kwargs)
+            order_id = self.kwargs.get("pk")
+            try:
+                customer = Customer.objects.filter(id=order_id).first()
+            except Customer.DoesNotExist:
+                return Response({"message": "Customer not found."}, status=404)
+            
+            data = request.data
+            book_price = 0
+            
+            try:
+                if data['books'] is not None:
+                    book_price = Book.objects.filter(id=data['books'][0]).first().price
+            except Exception as e:
+                return Response({"error": "Server Error", "status": False}, status=500)
+            
+            total_price = int(data['total_book']) * int(book_price)
+            data['total_price'] = total_price
+
+            serializer = CustomerSerializer(customer, data=data, partial=True)
+            
+            if serializer.is_valid():
+                serializer.save()
+                return Response({"message": "Data updated successfully.", "status": True}, status=200)
+            else:
+                return Response(serializer.errors, status=400)
         else:
-            return Response({"message": "UnAuthenticated"})
+            return Response({"message": "Unauthenticated."}, status=401)
 
 class DeleteCustomerAPIView(DestroyAPIView):
     queryset = Customer.objects.all()
@@ -313,51 +375,65 @@ class CommentAPIView(RetrieveUpdateDestroyAPIView):
 @api_view(['get'])
 def GetAllBookData(request, id):
     book_obj = Book.objects.filter(pk=id).first()
-    author_obj = Author.objects.filter(pk=book_obj.id).first()
-    publisher_obj = Publisher.objects.filter(pk=book_obj.id).first()
+    author_obj = Author.objects.filter(book=book_obj).first()
+    publisher_obj = Publisher.objects.filter(book=book_obj).first()
     customer_obj = Customer.objects.filter(books=book_obj)
+    dicts = {}
 
+    # for direct aggregation query if needed
     # total_price = Customer.objects.filter(books=book_obj).aggregate(total_price=Sum('total_price')).get('total_price')
     # total_book = Customer.objects.filter(books=book_obj).aggregate(total_book=Sum('total_book')).get('total_book')
 
-    dicts = {}
-    for i in customer_obj:
-        username = i.client.username
-        email = i.client.email
-        total_price = i.total_price
-        total_books = i.total_book
+    try: 
+        
+        if customer_obj != None:
+            for i in customer_obj:
+                username = i.client.username
+                email = i.client.email
+                total_price = i.total_price
+                total_books = i.total_book
 
-        if username not in dicts:
-            dicts[username] = {
-                'email': email,
-                'total_price': total_price,
-                'total_books': total_books
+                if username not in dicts:
+                    dicts[username] = {
+                        'email': email,
+                        'total_price': total_price,
+                        'total_books': total_books
+                    }
+                else:
+                    dicts[username]['email'] = email
+                    dicts[username]['total_price'] += total_price
+                    dicts[username]['total_books'] += total_books
+        else:
+            dicts = {}
+
+        if book_obj != None:
+            context = {
+                "book": book_obj.name,
+                "Uploaded_by": book_obj.users.username,
+                "year": book_obj.year,
+                "title": book_obj.title,
+                "price": float(book_obj.price),
+                "author details": {
+                    "name": author_obj.name if author_obj else None,
+                    "books written": author_obj.books_written if author_obj else None,
+                    "Uploaded Book": author_obj.book.name if author_obj else None
+                },
+                "publisher Details": {
+                    "name": publisher_obj.name if publisher_obj else None,
+                    "phone": publisher_obj.phone if publisher_obj else None,
+                    "Uploaded Book": publisher_obj.book.name if publisher_obj else None
+                },
+                "customer Details": dicts,
             }
         else:
-            dicts[username]['email'] = email
-            dicts[username]['total_price'] += total_price
-            dicts[username]['total_books'] += total_books
+            context = {
+                "Data": "Book not found..."
+            }
 
-    context = {
-        "book": book_obj.name,
-        "Uploaded_by": book_obj.users.username,
-        "year": book_obj.year,
-        "title": book_obj.title,
-        "price": float(book_obj.price),
-        "author details": {
-            "name": author_obj.name if author_obj else None,
-            "books written": author_obj.books_written if author_obj else None,
-            "Uploaded Book": author_obj.book.name if author_obj else None
-        },
-        "publisher Details": {
-            "name": publisher_obj.name if publisher_obj else None,
-            "phone": publisher_obj.phone if publisher_obj else None,
-            "Uploaded Book": publisher_obj.book.name if publisher_obj else None
-        },
-        "customer Details": dicts,
-    }
 
-    return Response(context, status=200)
+        return Response(context, status=200)
+    except Exception as e:
+        return Response({'error': str(e)}, status=500)
 
 # ------------------ Test Api View ------------------------------
 @api_view(['get'])

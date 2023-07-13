@@ -8,7 +8,6 @@ class UserSerializer(serializers.ModelSerializer):
         model = User
         fields = ('id', 'username', 'email')
 
-
 class RegisterSerializer(serializers.ModelSerializer):
     class Meta:
         model = User
@@ -39,13 +38,11 @@ class RegisterSerializer(serializers.ModelSerializer):
 
         return user
 
-
 class PublisherSerializer(serializers.ModelSerializer):
     
     class Meta:
         model = Publisher
         fields = '__all__'
-
 
 class AuthorSerializer(serializers.ModelSerializer):
     
@@ -58,8 +55,7 @@ class CustomerSerializer(serializers.ModelSerializer):
     class Meta:
         model = Customer
         fields = '__all__'
-        extra_kwargs = {'books': {'required': False}}
-
+        extra_kwargs = {'total_price': {'required': False} }
 
 class BookSerializer(serializers.ModelSerializer):
     publishers = PublisherSerializer(read_only=True)
@@ -69,10 +65,6 @@ class BookSerializer(serializers.ModelSerializer):
         model = Book
         fields = '__all__'
 
-
-    
-
-
 # -------------------------------------------------------------------------
 class CommentSerializer(serializers.ModelSerializer):
 
@@ -80,7 +72,6 @@ class CommentSerializer(serializers.ModelSerializer):
         model = Comment
         # fields = '__all__'
         exclude = ['book']
-
 
 class MyBookSerializer(serializers.ModelSerializer):
     comments = CommentSerializer(many=True, read_only=True)
